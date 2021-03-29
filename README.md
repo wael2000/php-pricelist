@@ -17,7 +17,7 @@ NOTE:
 
 ```
 user@host$ oc new-app --name=mysql -l appname=mysqlcrud --template=mysql-ephemeral \ 
--p DATABASE_SERVICE_NAME=mysql -p MYSQL_USER=pricelist -p MYSQL_PASSWORD=pricelist -p MYSQL_DATABASE=pricelist
+-p DATABASE_SERVICE_NAME=mysql -p MYSQL_USER=pricelist -p MYSQL_PASSWORD=pricelist -p MYSQL_DATABASE=pricelist -p MYSQL_DEFAULT_AUTHENTICATION_PLUGIN=mysql_native_password
 ```
 
 ## Create your application
