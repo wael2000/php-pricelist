@@ -1,36 +1,60 @@
 ---
-# tasks file for pricelist
+# tasks file for Pricelist
+- name: Create secret with db credentials
+  k8s:
+    state: present
+    definition: "{{ lookup('template', 'pricelist-secret.yaml.j2') }}"
+
+- name: Create configmap with db configuration for the frontend
+  k8s:
+    state: present
+    definition: "{{ lookup('template', 'pricelist-cm.yaml.j2') }}"
+
 - name: Create database storage
   k8s:
     state: present
     definition: "{{ lookup('template', 'pricelist-db-pvc.yaml.j2') }}"
-  when: dbstorage is defined
-
-- name: Wait for pvc to get bound
-  pause:
-    seconds: 15
-  when: dbstorage is defined
+  when: dbstorage
 
 - name: Create database deployment
   k8s:
     state: present
     definition: "{{ lookup('template', 'pricelist-db.yaml.j2') }}"
-  when: dbstorage is defined
+  when: dbstorage
 
 - name: Create database deployment
   k8s:
     state: present
     definition: "{{ lookup('template', 'pricelist-db-ephemeral.yaml.j2') }}"
-  when: dbstorage is not defined
-
-- name: Wait for DB to come up
-  pause:
-    seconds: 15
+  when: not dbstorage
 
 - name: Create database service
   k8s:
     state: present
     definition: "{{ lookup('template', 'pricelist-db-svc.yaml.j2') }}"
+
+- name: Wait for pvc to get bound
+  k8s_info:
+    api_version: v1
+    kind: PersistentVolumeClaim
+    name: "{{ ansible_operator_meta.name }}-db-pvc"
+    namespace: "{{ ansible_operator_meta.namespace }}"
+  register: dbpvc
+  until: dbpvc | json_query('resources[0].status.phase') == "Bound"
+  retries: 10
+  delay: 2
+  when: dbstorage
+
+- name: Wait for database to come up
+  k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: "{{ ansible_operator_meta.name }}-pricelist-db"
+    namespace: "{{ ansible_operator_meta.namespace }}"
+  register: dbdeploy
+  until: dbdeploy | json_query('resources[0].status.readyReplicas') == 1
+  retries: 20
+  delay: 2
 
 - name: Create frontend deployment
   k8s:
@@ -43,8 +67,15 @@
     definition: "{{ lookup('template', 'pricelist-svc.yaml.j2') }}"
 
 - name: Wait for frontend to come up
-  pause:
-    seconds: 10
+  k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: "{{ ansible_operator_meta.name }}-pricelist-frontend"
+    namespace: "{{ ansible_operator_meta.namespace }}"
+  register: fedeploy
+  until: fedeploy | json_query('resources[0].status.readyReplicas') == {{ frontends }}
+  retries: 20
+  delay: 2
 
 - name: Create frontend route
   k8s:

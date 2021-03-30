@@ -3,39 +3,68 @@ kind: Deployment
 metadata:
   creationTimestamp: null
   labels:
-    app: "{{ meta.name }}-pricelist"
+    app: "{{ ansible_operator_meta.name }}-pricelist"
     tier: database
-  name: "{{ meta.name }}-pricelist-db"
-  namespace: "{{ meta.namespace }}"
+  name: "{{ ansible_operator_meta.name }}-pricelist-db"
+  namespace: "{{ ansible_operator_meta.namespace }}"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: "{{ meta.name }}-pricelist"
+      app: "{{ ansible_operator_meta.name }}-pricelist"
       tier: database
   strategy: {}
   template:
     metadata:
       creationTimestamp: null
       labels:
-        app: "{{ meta.name }}-pricelist"
+        app: "{{ ansible_operator_meta.name }}-pricelist"
         tier: database
     spec:
       containers:
       - image: registry.access.redhat.com/rhscl/mysql-56-rhel7:latest
         imagePullPolicy: IfNotPresent
-        name: "{{ meta.name }}-pricelist-db"
+        livenessProbe:
+          failureThreshold: 5
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: 3306
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              mysql -u root -e "SELECT 1"
+          failureThreshold: 5
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        name: "{{ ansible_operator_meta.name }}-pricelist-db"
         env:
         - name: MYSQL_DATABASE
-          value: "{{ database }}"
+          valueFrom:
+            secretKeyRef:
+              name: "{{ ansible_operator_meta.name }}-pricelist-creds"
+              key: database
         - name: MYSQL_PASSWORD
-          value: "{{ dbpassword }}"
+          valueFrom:
+            secretKeyRef:
+              name: "{{ ansible_operator_meta.name }}-pricelist-creds"
+              key: dbpassword
         - name: MYSQL_USER
-          value: "{{ dbuser }}"
+          valueFrom:
+            secretKeyRef:
+              name: "{{ ansible_operator_meta.name }}-pricelist-creds"
+              key: dbuser
         resources: {}
         volumeMounts:
         - mountPath: /var/lib/mysql/data
-          name: "{{ meta.name }}-pricelist-db-store"
+          name: "{{ ansible_operator_meta.name }}-pricelist-db-store"
       volumes:
-      - name: "{{ meta.name }}-pricelist-db-store"
+      - name: "{{ ansible_operator_meta.name }}-pricelist-db-store"
         emptyDir: {}

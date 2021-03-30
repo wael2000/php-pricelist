@@ -1,6 +1,6 @@
 # Pricelist Operator
 
-You can now deploy Pricelist as an operator on OpenShift (Work is being done to "simplify" it so you can use it on "bare" Kubernetes too)
+You can now deploy Pricelist as an operator on OpenShift
 
 ## Installation
 
@@ -10,30 +10,25 @@ In order to install this Operator you need user a user that has a cluster role o
 oc login -u system:admin
 ```
 
-The Pricelist operator needs to be installed in a namespaces called `pricelist-operator`
-
-```
-oc new-project pricelist-operator
-oc project pricelist-operator
-```
-
-The installation manifest has configuration for the [service acocunt](pricelist-operator/deploy/service_account.yaml), the [role](pricelist-operator/deploy/role.yaml), the [role binding](pricelist-operator/deploy/role_binding.yaml), the [custom resource definition](pricelist-operator/crds/pricelist_v1alpha1_pricelist_crd.yaml), and finally the [operator](pricelist-operator/deploy/operator.yaml) itself. 
+The installation manifest has configuration for the [role](install/pricelist-operator.yaml#L48-L72), the [role binding](install/pricelist-operator.yaml#L193-L205), the [custom resource definition](install/pricelist-operator.yaml#L8-L46), and finally the [operator](install/pricelist-operator.yaml#L248-L282) itself. 
 
 After inspecting these manifests, feel free to use the [installer manifest](install/pricelist-operator.yaml) to install this operator
 
 ```
-oc create -f https://raw.githubusercontent.com/christianh814/php-pricelist/master/openshift/operator/install/pricelist-operator.yaml -n pricelist-operator
+oc create -f https://raw.githubusercontent.com/christianh814/php-pricelist/master/openshift/operator/install/pricelist-operator.yaml
 ```
 
 After a little bit the operator should be up and running
 
-```
-oc get pods
-NAME                                  READY     STATUS    RESTARTS   AGE
-pricelist-operator-5bd6f66485-998mt   2/2       Running   0          24s
+```shell
+# oc get pods
+NAME                                                     READY   STATUS    RESTARTS   AGE
+pricelist-operator-controller-manager-765967786c-r566b   2/2     Running   0          13m
 ```
 
 This Operator is ready for action! Proceed to the [usage](#usage) section to deploy an instance of Pricelist
+
+> Note: To view the logs of the operator run `oc logs -f <pod name> -c manager`
 
 ## Usage
 
@@ -53,7 +48,7 @@ oc project foobar
 Create the CR file. The only one required is how many frontends you'd like to deploy. Create a file called `pricelist.yaml` with the following content (Please see [Advanced Features](#advanced-features) for more CR options)
 
 ```yaml
-apiVersion: pricelist.chernand.io/v1alpha1
+apiVersion: pricelist.cloud.chx/v1alpha1
 kind: Pricelist
 metadata:
   name: myexample
@@ -99,7 +94,7 @@ By default the database name, the database user, and database password, are set 
 
 
 ```yaml
-apiVersion: pricelist.chernand.io/v1alpha1
+apiVersion: pricelist.cloud.chx/v1alpha1
 kind: Pricelist
 metadata:
   name: myexample
@@ -112,10 +107,10 @@ spec:
 
 __Database Storage__
 
-By default, the database uses `emptyDir` for storage; making the DB ephemeral. To have the operator deploy the DB with persistant storage, set the `dbstorage` variable to `yes`. (**NOTE** This assumes you have [Dynamic Volume Provisioning](https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/) setup!)
+By default, the database uses `emptyDir` for storage; making the DB ephemeral. To have the operator deploy the DB with persistant storage, set the `dbstorage` variable to `true`. (**NOTE** This assumes you have [Dynamic Volume Provisioning](https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/) setup!)
 
 ```yaml
-apiVersion: pricelist.chernand.io/v1alpha1
+apiVersion: pricelist.cloud.chx/v1alpha1
 kind: Pricelist
 metadata:
   name: myexample
@@ -124,21 +119,21 @@ spec:
   database: "mydatabase"
   dbuser: "mydbuser"
   dbpassword: "mysecretpassword"
-  dbstorage: yes
+  dbstorage: true
 ```
 
 __Database With StorageClass__
 
-If you do not want to use the default storageclass; you can set `dbstorageclass` to the name of the storageclass you'd like to use. (**NOTE**: You ___**MUST**___ set `dbstorage` to `yes` as well!!)
+If you do not want to use the default storageclass; you can set `dbstorageclass` to the name of the storageclass you'd like to use. (**NOTE**: You ___**MUST**___ set `dbstorage` to `true` as well!!)
 
 ```yaml
-apiVersion: pricelist.chernand.io/v1alpha1
+apiVersion: pricelist.cloud.chx/v1alpha1
 kind: Pricelist
 metadata:
   name: myexample
 spec:
   frontends: 1
-  dbstorage: yes
+  dbstorage: true
   dbstorageclass: "glusterfs-storage-block"
 ```
 
@@ -147,14 +142,7 @@ __Scale Frontends__
 You cannot scale this app by "normal" means (since it's being managed by the operator). So in order to scale the frontend web app; just change the `frontends` in your CR definition. Fastest way is...
 
 ```
-$ cat <<EOF | oc replace -f -
-apiVersion: pricelist.chernand.io/v1alpha1
-kind: Pricelist
-metadata:
-  name: myexample
-spec:
-  frontends: 2
-EOF
+oc patch pricelist myexample --type=merge -p '{"spec":{"frontends":2}}'
 ```
 
 You can also just edit the CR as you would any normal resource
@@ -164,3 +152,10 @@ oc edit pricelist myexample
 ```
 
 After a little bit you will see the application scale!
+
+## Known Issues
+
+These are a list of known issues
+
+* You cannot scale the MySQL DB.
+
